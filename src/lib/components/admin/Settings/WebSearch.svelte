@@ -16,6 +16,7 @@
 		'searxng',
 		'google_pse',
 		'brave',
+		'bing',
 		'serpstack',
 		'serper',
 		'serply',
@@ -148,6 +149,17 @@
 								<SensitiveInput
 									placeholder={$i18n.t('Enter Brave Search API Key')}
 									bind:value={webConfig.search.brave_search_api_key}
+								/>
+							</div>
+						{:else if webConfig.search.engine === 'bing'}
+							<div>
+								<div class=" self-center text-xs font-medium mb-1">
+									{$i18n.t('Bing Search API Key')}
+								</div>
+
+								<SensitiveInput
+									placeholder={$i18n.t('Enter Bing Search API Key')}
+									bind:value={webConfig.search.bing_search_api_key}
 								/>
 							</div>
 						{:else if webConfig.search.engine === 'serpstack'}
