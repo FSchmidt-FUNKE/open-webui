@@ -21,7 +21,7 @@ log.setLevel(SRC_LOG_LEVELS["RAG"])
 
 def validate_url(url: Union[str, Sequence[str]]):
     if isinstance(url, str):
-        if isinstance(validators.url(url), validators.ValidationError):
+        if isinstance(validators.url(url, strict_query=False), validators.ValidationError):
             raise ValueError(ERROR_MESSAGES.INVALID_URL)
         if not ENABLE_RAG_LOCAL_WEB_FETCH:
             # Local web fetch is disabled, filter out any URLs that resolve to private IP addresses
