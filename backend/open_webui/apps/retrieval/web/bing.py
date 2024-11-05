@@ -29,7 +29,7 @@ def search_bing(
     """
     url = "https://api.bing.microsoft.com/v7.0/search"
     headers = {"Ocp-Apim-Subscription-Key": api_key }
-    params = {"q": query, "mkt": "de-DE", "responseFilter": "Webpages", 'count': count , 'offset': 0}
+    params = {"q": query, "mkt": "en-US", "responseFilter": "Webpages", 'count': count , 'offset': 0}
 
     response = requests.get(url, headers=headers, params=params)
     response.raise_for_status()
