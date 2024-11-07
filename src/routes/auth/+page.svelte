@@ -1,25 +1,32 @@
 <script>
+	import { toast } from 'svelte-sonner';
+
+	import { onMount, getContext } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { getSessionUser, userSignIn, userSignUp } from '$lib/apis/auths';
-	import Spinner from '$lib/components/common/Spinner.svelte';
+	import { page } from '$app/stores';
+
+	import { getBackendConfig } from '$lib/apis';
+	import { ldapUserSignIn, getSessionUser, userSignIn, userSignUp } from '$lib/apis/auths';
+
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
 	import { WEBUI_NAME, config, user, socket } from '$lib/stores';
-	import { onMount, getContext } from 'svelte';
-	import { toast } from 'svelte-sonner';
+
 	import { generateInitialsImage, canvasPixelTest } from '$lib/utils';
-	import { page } from '$app/stores';
-	import { getBackendConfig } from '$lib/apis';
-	import SlideShow from '$lib/components/common/SlideShow.svelte';
+
+	import Spinner from '$lib/components/common/Spinner.svelte';
 	import OnBoarding from '$lib/components/OnBoarding.svelte';
 
 	const i18n = getContext('i18n');
 
 	let loaded = false;
-	let mode = 'signin';
+
+	let mode = $config?.features.enable_ldap ? 'ldap' : 'signin';
 
 	let name = '';
 	let email = '';
 	let password = '';
+
+	let ldapUsername = '';
 
 	const setSessionUser = async (sessionUser) => {
 		if (sessionUser) {
@@ -56,8 +63,18 @@
 		await setSessionUser(sessionUser);
 	};
 
+	const ldapSignInHandler = async () => {
+		const sessionUser = await ldapUserSignIn(ldapUsername, password).catch((error) => {
+			toast.error(error);
+			return null;
+		});
+		await setSessionUser(sessionUser);
+	};
+
 	const submitHandler = async () => {
-		if (mode === 'signin') {
+		if (mode === 'ldap') {
+			await ldapSignInHandler();
+		} else if (mode === 'signin') {
 			await signInHandler();
 		} else {
 			await signUpHandler();
@@ -95,6 +112,7 @@
 			await goto('/');
 		}
 		await checkOauthCallback();
+
 		loaded = true;
 		if (($config?.features.auth_trusted_header ?? false) || $config?.features.auth === false) {
 			await signInHandler();
@@ -114,7 +132,7 @@
 	bind:show={onboarding}
 	getStartedHandler={() => {
 		onboarding = false;
-		mode = 'signup';
+		mode = $config?.features.enable_ldap ? 'ldap' : 'signup';
 	}}
 />
 
@@ -157,22 +175,25 @@
 					<div class="  my-auto pb-10 w-full dark:text-gray-100">
 						<form
 							class=" flex flex-col justify-center"
-							on:submit|preventDefault={() => {
+							on:submit={(e) => {
+								e.preventDefault();
 								submitHandler();
 							}}
 						>
 							<div class="mb-1">
 								<div class=" text-2xl font-medium">
-									{#if mode === 'signin'}
-										{$i18n.t(`Sign in to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
-									{:else if $config?.onboarding ?? false}
+									{#if $config?.onboarding ?? false}
 										{$i18n.t(`Get started with {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
+									{:else if mode === 'ldap'}
+										{$i18n.t(`Sign in to {{WEBUI_NAME}} with LDAP`, { WEBUI_NAME: $WEBUI_NAME })}
+									{:else if mode === 'signin'}
+										{$i18n.t(`Sign in to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
 									{:else}
 										{$i18n.t(`Sign up to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
 									{/if}
 								</div>
 
-								{#if mode === 'signup' && ($config?.onboarding ?? false)}
+								{#if $config?.onboarding ?? false}
 									<div class=" mt-1 text-xs font-medium text-gray-500">
 										ⓘ {$WEBUI_NAME}
 										{$i18n.t(
@@ -198,17 +219,31 @@
 										</div>
 									{/if}
 
-									<div class="mb-2">
-										<div class=" text-sm font-medium text-left mb-1">{$i18n.t('Email')}</div>
-										<input
-											bind:value={email}
-											type="email"
-											class="my-0.5 w-full text-sm outline-none bg-transparent"
-											autocomplete="email"
-											placeholder={$i18n.t('Enter Your Email')}
-											required
-										/>
-									</div>
+									{#if mode === 'ldap'}
+										<div class="mb-2">
+											<div class=" text-sm font-medium text-left mb-1">{$i18n.t('Username')}</div>
+											<input
+												bind:value={ldapUsername}
+												type="text"
+												class="my-0.5 w-full text-sm outline-none bg-transparent"
+												autocomplete="username"
+												placeholder={$i18n.t('Enter Your Username')}
+												required
+											/>
+										</div>
+									{:else}
+										<div class="mb-2">
+											<div class=" text-sm font-medium text-left mb-1">{$i18n.t('Email')}</div>
+											<input
+												bind:value={email}
+												type="email"
+												class="my-0.5 w-full text-sm outline-none bg-transparent"
+												autocomplete="email"
+												placeholder={$i18n.t('Enter Your Email')}
+												required
+											/>
+										</div>
+									{/if}
 
 									<div>
 										<div class=" text-sm font-medium text-left mb-1">{$i18n.t('Password')}</div>
@@ -224,43 +259,51 @@
 									</div>
 								</div>
 							{/if}
-
-							{#if $config?.features.enable_login_form}
-								<div class="mt-5">
-									<button
-										class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-										type="submit"
-									>
-										{mode === 'signin'
-											? $i18n.t('Sign in')
-											: ($config?.onboarding ?? false)
-												? $i18n.t('Create Admin Account')
-												: $i18n.t('Create Account')}
-									</button>
-
-									{#if $config?.features.enable_signup && !($config?.onboarding ?? false)}
-										<div class=" mt-4 text-sm text-center">
+							<div class="mt-5">
+								{#if $config?.features.enable_login_form}
+									{#if mode === 'ldap'}
+										<button
+											class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+											type="submit"
+										>
+											{$i18n.t('Authenticate')}
+										</button>
+									{:else}
+										<button
+											class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+											type="submit"
+										>
 											{mode === 'signin'
-												? $i18n.t("Don't have an account?")
-												: $i18n.t('Already have an account?')}
+												? $i18n.t('Sign in')
+												: ($config?.onboarding ?? false)
+													? $i18n.t('Create Admin Account')
+													: $i18n.t('Create Account')}
+										</button>
 
-											<button
-												class=" font-medium underline"
-												type="button"
-												on:click={() => {
-													if (mode === 'signin') {
-														mode = 'signup';
-													} else {
-														mode = 'signin';
-													}
-												}}
-											>
-												{mode === 'signin' ? $i18n.t('Sign up') : $i18n.t('Sign in')}
-											</button>
-										</div>
+										{#if $config?.features.enable_signup && !($config?.onboarding ?? false)}
+											<div class=" mt-4 text-sm text-center">
+												{mode === 'signin'
+													? $i18n.t("Don't have an account?")
+													: $i18n.t('Already have an account?')}
+
+												<button
+													class=" font-medium underline"
+													type="button"
+													on:click={() => {
+														if (mode === 'signin') {
+															mode = 'signup';
+														} else {
+															mode = 'signin';
+														}
+													}}
+												>
+													{mode === 'signin' ? $i18n.t('Sign up') : $i18n.t('Sign in')}
+												</button>
+											</div>
+										{/if}
 									{/if}
-								</div>
-							{/if}
+								{/if}
+							</div>
 						</form>
 
 						{#if Object.keys($config?.oauth?.providers ?? {}).length > 0}
@@ -278,7 +321,7 @@
 							<div class="flex flex-col space-y-2">
 								{#if $config?.oauth?.providers?.google}
 									<button
-										class="flex items-center px-6 border-2 dark:border-gray-800 duration-300 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 w-full rounded-2xl dark:text-white text-sm py-3 transition"
+										class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 										on:click={() => {
 											window.location.href = `${WEBUI_BASE_URL}/oauth/google/login`;
 										}}
@@ -303,7 +346,7 @@
 								{/if}
 								{#if $config?.oauth?.providers?.microsoft}
 									<button
-										class="flex items-center px-6 border-2 dark:border-gray-800 duration-300 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 w-full rounded-2xl dark:text-white text-sm py-3 transition"
+										class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 										on:click={() => {
 											window.location.href = `${WEBUI_BASE_URL}/oauth/microsoft/login`;
 										}}
@@ -328,7 +371,7 @@
 								{/if}
 								{#if $config?.oauth?.providers?.oidc}
 									<button
-										class="flex items-center px-6 border-2 dark:border-gray-800 duration-300 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800 w-full rounded-2xl dark:text-white text-sm py-3 transition"
+										class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 										on:click={() => {
 											window.location.href = `${WEBUI_BASE_URL}/oauth/oidc/login`;
 										}}
@@ -355,6 +398,26 @@
 										>
 									</button>
 								{/if}
+							</div>
+						{/if}
+
+						{#if $config?.features.enable_ldap}
+							<div class="mt-2">
+								<button
+									class="flex justify-center items-center text-xs w-full text-center underline"
+									type="button"
+									on:click={() => {
+										if (mode === 'ldap')
+											mode = ($config?.onboarding ?? false) ? 'signup' : 'signin';
+										else mode = 'ldap';
+									}}
+								>
+									<span
+										>{mode === 'ldap'
+											? $i18n.t('Continue with Email')
+											: $i18n.t('Continue with LDAP')}</span
+									>
+								</button>
 							</div>
 						{/if}
 					</div>

@@ -20,6 +20,7 @@ from open_webui.env import (
     WEBUI_FAVICON_URL,
     WEBUI_NAME,
     log,
+    DATABASE_URL,
 )
 from pydantic import BaseModel
 from sqlalchemy import JSON, Column, DateTime, Integer, func
@@ -904,6 +905,12 @@ TAGS_GENERATION_PROMPT_TEMPLATE = PersistentConfig(
     os.environ.get("TAGS_GENERATION_PROMPT_TEMPLATE", ""),
 )
 
+ENABLE_TAGS_GENERATION = PersistentConfig(
+    "ENABLE_TAGS_GENERATION",
+    "task.tags.enable",
+    os.environ.get("ENABLE_TAGS_GENERATION", "True").lower() == "true",
+)
+
 ENABLE_SEARCH_QUERY = PersistentConfig(
     "ENABLE_SEARCH_QUERY",
     "task.search.enable",
@@ -963,6 +970,13 @@ OPENSEARCH_SSL = os.environ.get("OPENSEARCH_SSL", True)
 OPENSEARCH_CERT_VERIFY = os.environ.get("OPENSEARCH_CERT_VERIFY", False)
 OPENSEARCH_USERNAME = os.environ.get("OPENSEARCH_USERNAME", None)
 OPENSEARCH_PASSWORD = os.environ.get("OPENSEARCH_PASSWORD", None)
+
+# Pgvector
+PGVECTOR_DB_URL = os.environ.get("PGVECTOR_DB_URL", DATABASE_URL)
+if VECTOR_DB == "pgvector" and not PGVECTOR_DB_URL.startswith("postgres"):
+    raise ValueError(
+        "Pgvector requires setting PGVECTOR_DB_URL or using Postgres with vector extension as the primary database."
+    )
 
 ####################################
 # Information Retrieval (RAG)
@@ -1577,4 +1591,75 @@ AUDIO_TTS_AZURE_SPEECH_OUTPUT_FORMAT = PersistentConfig(
     os.getenv(
         "AUDIO_TTS_AZURE_SPEECH_OUTPUT_FORMAT", "audio-24khz-160kbitrate-mono-mp3"
     ),
+)
+
+
+####################################
+# LDAP
+####################################
+
+ENABLE_LDAP = PersistentConfig(
+    "ENABLE_LDAP",
+    "ldap.enable",
+    os.environ.get("ENABLE_LDAP", "false").lower() == "true",
+)
+
+LDAP_SERVER_LABEL = PersistentConfig(
+    "LDAP_SERVER_LABEL",
+    "ldap.server.label",
+    os.environ.get("LDAP_SERVER_LABEL", "LDAP Server"),
+)
+
+LDAP_SERVER_HOST = PersistentConfig(
+    "LDAP_SERVER_HOST",
+    "ldap.server.host",
+    os.environ.get("LDAP_SERVER_HOST", "localhost"),
+)
+
+LDAP_SERVER_PORT = PersistentConfig(
+    "LDAP_SERVER_PORT",
+    "ldap.server.port",
+    int(os.environ.get("LDAP_SERVER_PORT", "389")),
+)
+
+LDAP_ATTRIBUTE_FOR_USERNAME = PersistentConfig(
+    "LDAP_ATTRIBUTE_FOR_USERNAME",
+    "ldap.server.attribute_for_username",
+    os.environ.get("LDAP_ATTRIBUTE_FOR_USERNAME", "uid"),
+)
+
+LDAP_APP_DN = PersistentConfig(
+    "LDAP_APP_DN", "ldap.server.app_dn", os.environ.get("LDAP_APP_DN", "")
+)
+
+LDAP_APP_PASSWORD = PersistentConfig(
+    "LDAP_APP_PASSWORD",
+    "ldap.server.app_password",
+    os.environ.get("LDAP_APP_PASSWORD", ""),
+)
+
+LDAP_SEARCH_BASE = PersistentConfig(
+    "LDAP_SEARCH_BASE", "ldap.server.users_dn", os.environ.get("LDAP_SEARCH_BASE", "")
+)
+
+LDAP_SEARCH_FILTERS = PersistentConfig(
+    "LDAP_SEARCH_FILTER",
+    "ldap.server.search_filter",
+    os.environ.get("LDAP_SEARCH_FILTER", ""),
+)
+
+LDAP_USE_TLS = PersistentConfig(
+    "LDAP_USE_TLS",
+    "ldap.server.use_tls",
+    os.environ.get("LDAP_USE_TLS", "True").lower() == "true",
+)
+
+LDAP_CA_CERT_FILE = PersistentConfig(
+    "LDAP_CA_CERT_FILE",
+    "ldap.server.ca_cert_file",
+    os.environ.get("LDAP_CA_CERT_FILE", ""),
+)
+
+LDAP_CIPHERS = PersistentConfig(
+    "LDAP_CIPHERS", "ldap.server.ciphers", os.environ.get("LDAP_CIPHERS", "ALL")
 )
