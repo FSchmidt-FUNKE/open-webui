@@ -1,12 +1,13 @@
 
 import logging
-import os 
 from pprint import pprint
 from typing import Optional
 import requests
+import argparse
+
 from open_webui.apps.retrieval.web.main import SearchResult, get_filtered_results
 from open_webui.env import SRC_LOG_LEVELS
-import argparse
+
 
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS["RAG"])
@@ -16,8 +17,8 @@ Documentation: https://docs.microsoft.com/en-us/bing/search-apis/bing-web-search
 def search_bing(
     subscription_key: str, endpoint: str, locale: str, query: str, count: int, filter_list: Optional[list[str]] = None
 ) -> list[SearchResult]:
-    mkt = locale
-    params = { 'q': query, 'mkt': mkt, 'answerCount': count }
+    mkt = locale if locale else "de-DE"
+    params = { 'q': query, 'mkt': mkt, 'count': count, 'offset': 0, 'responseFilter': 'Webpages' }
     headers = { 'Ocp-Apim-Subscription-Key': subscription_key }
 
     try:
@@ -39,7 +40,7 @@ def search_bing(
         log.error(f"Error: {ex}")
         raise ex
     
-def main():
+if __name__=='__main__':
     parser = argparse.ArgumentParser(description="Search Bing from the command line.")
     parser.add_argument("query", type=str, default="Top 10 international news today", help="The search query.")
     parser.add_argument("--count", type=int, default=10, help="Number of search results to return.")
